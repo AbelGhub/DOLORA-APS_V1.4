@@ -1,0 +1,16 @@
+{
+  "name": "Dolora — Acute Pain Service",
+  "short_name": "Dolora",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#EAF2FA",
+  "theme_color": "#0C2038",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
