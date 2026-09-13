@@ -1,0 +1,6 @@
+{
+  "name": "Dolora — Acute Pain Service",
+  "description": "Acute Pain Service rounds, bolus tracking, and clinical audits.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

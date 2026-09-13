@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="112" fill="#0C2038"/>
+  <circle cx="256" cy="256" r="180" fill="#132B47" stroke="#254870" stroke-width="8"/>
+  <!-- Medical Plus Accent -->
+  <path d="M256 120 V200 M216 160 H296" stroke="#4A90E2" stroke-width="16" stroke-linecap="round"/>
+  <!-- Dolora Monogram 'D' -->
+  <path d="M200 180 H260 C320 180 340 210 340 260 C340 310 320 340 260 340 H200 Z" fill="none" stroke="#FFFFFF" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M200 180 V340" stroke="#4A90E2" stroke-width="28" stroke-linecap="round"/>
+</svg>
