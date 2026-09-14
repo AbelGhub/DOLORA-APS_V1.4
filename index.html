@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Dolora — Acute Pain Service</title>
+<meta name="description" content="Acute Pain Service rounds, bolus tracking, and clinical audits." />
+<meta property="og:title" content="Dolora — Acute Pain Service" />
+<meta property="og:description" content="Acute Pain Service rounds, bolus tracking, and clinical audits." />
+<meta property="og:type" content="website" />
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0C2038">
+<link rel="icon" type="image/svg+xml" href="/icon.svg">
+<!-- iOS home screen support -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Dolora">
+<link rel="apple-touch-icon" href="/icon.svg">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script type="module" src="/src/dolora-storage.js"></script>
+<link rel="stylesheet" href="/src/dolora.css">
+</head>
+<body>
+
+<!-- LOGIN / SIGN UP GATE -->
+<div id="authGate" class="gate-screen">
+  <div class="gate-card card">
+    <div class="gate-brand">Dolora<small>Acute Pain Service</small></div>
+    <div id="authError" class="gate-error" style="display:none;"></div>
+    <div id="authMsg" class="gate-msg" style="display:none;"></div>
+
+    <label id="auth-name-label" style="display:none;">Full name</label>
+    <input type="text" id="auth-name" style="display:none;" placeholder="Dr. First Last">
+    <label>Email</label>
+    <input type="text" id="auth-email" autocomplete="username" placeholder="you@cmcvellore.ac.in">
+    <label>Password</label>
+    <input type="password" id="auth-password" autocomplete="current-password" placeholder="••••••••">
+
+    <button class="btn" id="authSubmitBtn">Log in</button>
+    <button class="btn secondary" id="authToggleBtn" type="button" style="margin-top:10px;">New here? Create an account</button>
+  </div>
+</div>
+
+<!-- PENDING APPROVAL -->
+<div id="pendingGate" class="gate-screen" style="display:none;">
+  <div class="gate-card card">
+    <div class="gate-brand">Dolora<small>Acute Pain Service</small></div>
+    <div class="empty">
+      <div class="big">⏳</div>
+      <p>Your request is pending approval.<br>An admin needs to approve your account before you can see patient data.</p>
+    </div>
+    <button class="btn secondary" id="pendingSignOutBtn" type="button">Sign out</button>
+  </div>
+</div>
+
+<div class="drawer-backdrop" id="drawerBackdrop"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-head">Menu</div>
+  <div class="drawer-account" id="drawerAccount"></div>
+  <button class="drawer-link" data-view="dashboard">Dashboard</button>
+  <button class="drawer-link" data-view="admin" id="adminDrawerBtn" style="display:none;">Admin</button>
+  <button class="drawer-link" data-view="insights">Insights</button>
+  <button class="drawer-link" id="signOutBtn">Sign out</button>
+</div>
+
+<div id="appRoot" style="display:none;">
+<div class="topbar">
+  <div class="topbar-row">
+    <div class="topbar-left">
+      <button class="menu-btn" id="menuBtn" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg></button>
+      <div class="brand">Dolora<small>Acute Pain Service</small></div>
+    </div>
+    <div class="topbar-right">
+      <div class="topbar-date" id="topbarDate">--</div>
+      <div class="clock" id="clock">--:--</div>
+    </div>
+  </div>
+</div>
+
+<div class="campus-bar" id="campusBar">
+  <button class="campus-pill active" data-campus="all">All campuses</button>
+  <button class="campus-pill" data-campus="Main Campus">Main Campus</button>
+  <button class="campus-pill" data-campus="Ranipet">Ranipet</button>
+</div>
+
+<!-- DASHBOARD -->
+<div class="view" id="view-dashboard">
+  <div class="banner">Shared across the whole APS team — everyone using this app sees the same live data.</div>
+
+  <div class="section-title"><h2>Active status</h2></div>
+  <div class="stat-grid">
+    <div class="stat-card"><div class="num" id="statActive">0</div><div class="lbl">Active patients</div></div>
+    <div class="stat-card"><div class="num" id="statWards">0</div><div class="lbl">Wards covered</div></div>
+    <div class="stat-card"><div class="num" id="statToday">0</div><div class="lbl">Added today</div></div>
+  </div>
+
+  <div class="section-title"><h2>By ward</h2></div>
+  <div class="ward-chip-list" id="wardChips"></div>
+
+  <div class="section-title"><h2>Recently added</h2></div>
+  <div class="board" id="recentBoard"></div>
+</div>
+
+<!-- ADD -->
+<div class="view active" id="view-add">
+  <div class="section-title"><h2>New entry from yellow sheet</h2></div>
+  <div class="card">
+    <div class="row2">
+      <div><label>Hospital No *</label><input type="text" id="f-hno" placeholder="e.g. H0234871"></div>
+      <div><label>Campus</label>
+        <select id="f-campus"><option>Main Campus</option><option>Ranipet</option></select>
+      </div>
+    </div>
+    <div class="row2">
+      <div><label>Ward</label><input type="text" id="f-ward" list="wardOptions" placeholder="e.g. SW4"><datalist id="wardOptions"></datalist></div>
+      <div><label>Bed</label><input type="text" id="f-bed" placeholder="e.g. 12"></div>
+    </div>
+    <label>Name</label><input type="text" id="f-name" placeholder="Patient name">
+
+    <div class="row2 row2-date">
+      <div><label>APS Date</label><input type="date" id="f-apsdate"></div>
+      <div>
+        <label>Done by</label>
+        <select id="f-doneby-role">
+          <option value="anaesthetist" selected>Anaesthetist</option>
+          <option value="surgeon">Surgeon</option>
+        </select>
+      </div>
+    </div>
+    <div id="f-doneby-name-wrap">
+      <label id="f-doneby-label">Anaesthetist name</label>
+      <input type="text" id="f-doneby" list="doneby-suggestions" placeholder="e.g. Dr. Anand">
+      <div class="field-hint" id="f-doneby-hint" style="display:none;color:#92400E;background:#FEF3C7;border:1px solid #FDE68A;padding:7px 10px;border-radius:6px;margin-top:4px;">
+        Registered for catheter safety & institutional tracking. Excluded from daily APS rounds and audit KPIs.
+      </div>
+    </div>
+    <div class="row2">
+      <div><label>Age</label><input type="number" id="f-age" placeholder="e.g. 54"></div>
+      <div><label>Gender</label>
+        <select id="f-gender"><option value="">—</option><option>Male</option><option>Female</option><option>Other</option></select>
+      </div>
+    </div>
+    <label>Dx (diagnosis)</label>
+    <input type="text" id="f-dx" list="dx-suggestions" placeholder="e.g. Ca stomach">
+    <label>Surgery</label>
+    <input type="text" id="f-surgery" list="surgery-suggestions" placeholder="e.g. Total gastrectomy">
+
+    <label>APS mode</label>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <select id="f-mode" style="flex:1;">
+        <option value="Epidural">Epidural</option>
+        <option value="NBC">NBC (Nerve Block Catheter)</option>
+        <option value="PCA">PCA (Patient Controlled Analgesia)</option>
+        <option value="Dosifuser">Dosifuser</option>
+      </select>
+      <span class="mode-badge" id="f-mode-badge">Epidural</span>
+    </div>
+    <div style="font-size:11px;color:var(--ink-soft);font-weight:600;margin:12px 0 5px;">Location</div>
+    <input type="text" id="f-location" placeholder="e.g. T9–T10 epidural level / Femoral nerve block (L)">
+    <div class="field-hint">Level of epidural insertion, or site of the nerve block catheter.</div>
+
+    <div style="background:var(--surface-soft);border-radius:8px;padding:10px 12px;margin-top:10px;">
+      <div id="f-loc-header" style="display:none;font-size:13px;font-weight:800;color:var(--ink);margin-bottom:6px;"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+        <span style="font-size:11px;font-weight:700;color:var(--ink-soft);">Day 0</span>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <label style="margin:0;font-size:11px;">Status:</label>
+          <select id="f-activation" style="width:auto;max-width:140px;padding:3px 6px;font-size:11px;font-weight:600;">
+            <option value="active">Active</option>
+            <option value="inactive">Not yet activated</option>
+          </select>
+        </div>
+      </div>
+      <div class="row2">
+        <div><label>Drug</label><input type="text" id="f-drug" placeholder="e.g. Ropivacaine 0.2%"></div>
+        <div><label>Volume (ml)</label><input type="text" id="f-freq" placeholder="e.g. 5ml/hr, 10ml top-up"></div>
+      </div>
+      <div class="row2">
+        <div><label>Dosing schedule</label><select id="f-freqtype">
+          <option value="">— Select —</option>
+          <option value="Continuous">Continuous</option>
+          <option value="PIB Pump">PIB Pump</option>
+          <option value="Q6H">Q6H</option>
+          <option value="Q8H">Q8H</option>
+          <option value="Q12H">Q12H</option>
+          <option value="Other">Other</option>
+        </select></div>
+        <div><label>Started at</label><input type="time" id="f-startedat"></div>
+      </div>
+      <div class="field-hint" id="f-bolus-hint" style="display:none;"></div>
+      <div class="field-hint" style="margin-top:6px;">If marked "Not yet activated", pain-score checks on rounds are waived until activated.</div>
+    </div>
+
+    <div id="nbcSecondCathWrap" style="display:none;">
+      <button type="button" class="btn secondary" id="addSecondCathBtn" style="margin-top:10px;width:100%;">+ Add second nerve block catheter</button>
+      <div id="secondCathBlock" style="display:none;">
+        <div style="font-size:11px;color:var(--ink-soft);font-weight:600;margin:12px 0 5px;">Location</div>
+        <input type="text" id="f2-location" placeholder="e.g. Sciatic (L)">
+        <div class="field-hint">Site of this second nerve block catheter.</div>
+        <div style="background:var(--surface-soft);border-radius:8px;padding:10px 12px;margin-top:10px;">
+          <div id="f2-loc-header" style="display:none;font-size:13px;font-weight:800;color:var(--ink);margin-bottom:6px;"></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+            <span style="font-size:11px;font-weight:700;color:var(--ink-soft);">Day 0</span>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <label style="margin:0;font-size:11px;">Status:</label>
+              <select id="f2-activation" style="width:auto;max-width:140px;padding:3px 6px;font-size:11px;font-weight:600;">
+                <option value="active">Active</option>
+                <option value="inactive">Not yet activated</option>
+              </select>
+            </div>
+          </div>
+          <div class="row2">
+            <div><label>Drug</label><input type="text" id="f2-drug" placeholder="e.g. Ropivacaine 0.2%"></div>
+            <div><label>Volume (ml)</label><input type="text" id="f2-freq" placeholder="e.g. 5ml/hr, 10ml top-up"></div>
+          </div>
+          <div class="row2">
+            <div><label>Dosing schedule</label><select id="f2-freqtype">
+              <option value="">— Select —</option>
+              <option value="Continuous">Continuous</option>
+              <option value="PIB Pump">PIB Pump</option>
+              <option value="Q6H">Q6H</option>
+              <option value="Q8H">Q8H</option>
+              <option value="Q12H">Q12H</option>
+              <option value="Other">Other</option>
+            </select></div>
+            <div><label>Started at</label><input type="time" id="f2-startedat"></div>
+          </div>
+          <div class="field-hint">Tracked separately from here on — its own dosing, bolus timers, and daily review rows.</div>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn" id="submitBtn">Add to rounds</button>
+  </div>
+</div>
+
+<!-- ROOM (Main Campus / Ranipet) -->
+<div class="view" id="view-room">
+  <div class="section-title"><h2 id="roomTitle">Main Campus</h2></div>
+  <div class="room-subtabs">
+    <button class="room-subtab active" data-roomtab="rounds">Rounds</button>
+    <button class="room-subtab" data-roomtab="updates">Updates</button>
+    <button class="room-subtab" data-roomtab="bolus">Bolus</button>
+  </div>
+
+  <div class="room-panel" id="roomPanel-rounds">
+    <div class="section-title"><h2>Sorted by ward</h2><span class="count-pill" id="roundsCount">0</span></div>
+    <div id="roundsBoard"></div>
+  </div>
+
+  <div class="room-panel" id="roomPanel-updates" style="display:none;">
+    <div class="card">
+      <div class="update-feed" id="updateFeed"></div>
+      <div id="updatePostRow" style="margin-top:12px;">
+        <label>Update</label><input type="text" id="updateText" placeholder="e.g. Bed 12 pump alarming, please review">
+      </div>
+      <button class="btn" id="postUpdateBtn">Post update</button>
+    </div>
+  </div>
+
+  <div class="room-panel" id="roomPanel-bolus" style="display:none;">
+    <div class="section-title"><h2>Sorted by ward, most overdue first</h2><span class="count-pill" id="bolusCount">0</span></div>
+    <div class="banner">Only Q6H / Q8H / Q12H interval dosing shows here — Continuous, PIB Pump, and Other are excluded.</div>
+    <div id="bolusBoard"></div>
+  </div>
+</div>
+
+<!-- EAGLE -->
+<div class="view" id="view-eagle">
+  <div class="section-title"><h2>Bird's eye registry</h2><span class="count-pill" id="eagleCount">0</span></div>
+  
+  <!-- Month selection calendar controls & Export -->
+  <div class="eagle-bar">
+    <div class="eagle-month-controls">
+      <button type="button" class="eagle-nav-btn" id="eaglePrevMonthBtn" title="Previous month">‹</button>
+      <input type="month" id="eagleMonthPicker" class="eagle-month-input" title="Pick calendar month">
+      <button type="button" class="eagle-nav-btn" id="eagleNextMonthBtn" title="Next month">›</button>
+      <button type="button" class="eagle-nav-pill" id="eagleThisMonthBtn">This month</button>
+      <button type="button" class="eagle-nav-pill" id="eagleAllTimeBtn">All time</button>
+    </div>
+    <button class="btn secondary" id="exportBtn" style="margin:0;width:auto;padding:7px 14px;font-size:12px;white-space:nowrap;">Export to Excel</button>
+  </div>
+
+  <!-- Campus-specific Month -> Team display -->
+  <div class="eagle-team-card" id="eagleTeamCard">
+    <div class="eagle-team-header">
+      <div class="eagle-team-title">
+        <span class="eagle-team-icon">📋</span>
+        <span class="eagle-team-label">APS Duty Teams · <strong id="eagleTeamMonthLabel">—</strong></span>
+      </div>
+      <button type="button" class="btn secondary" id="editEagleTeamBtn" style="display:none;width:auto;margin:0;padding:4px 10px;font-size:11.5px;">Edit teams</button>
+    </div>
+    <div id="eagleTeamBody" class="eagle-team-body">
+      <span class="field-hint">Loading duty teams…</span>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table id="eagleTable">
+      <thead><tr>
+        <th>Campus</th><th>Ward</th><th>Bed</th><th>Hosp No</th><th>Name</th><th>APS Date</th><th>Gender</th><th>Age</th>
+        <th class="wide">Dx</th><th class="wide">Surgery</th><th>APS Mode</th><th>Catheter</th><th class="wide">Location</th><th>Done by</th><th>Drug</th><th>Volume (ml)</th>
+        <th class="wide">Anticoag Status</th><th>Day 0</th><th>Day 1</th><th>Day 2</th><th>Day 3</th><th>Day 4</th><th>Day 5</th><th>Status</th>
+      </tr></thead>
+      <tbody id="eagleBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ADMIN (visible to admins only) -->
+<div class="view" id="view-admin">
+  <div class="section-title"><h2>Monthly duty team rosters</h2></div>
+  <div class="card" style="padding:14px;margin-bottom:18px;">
+    <div style="font-size:12px;color:var(--ink-soft);margin-bottom:10px;">
+      Assign the clinical doctors and team members for any month. This roster appears on the Bird's Eye registry and is recorded with clinical audits.
+    </div>
+    <div class="row2">
+      <div>
+        <label>Select month</label>
+        <input type="month" id="adminRosterMonth">
+      </div>
+      <div style="display:flex;align-items:flex-end;">
+        <button type="button" class="btn secondary" id="adminLoadRosterBtn" style="margin:0 0 1px;padding:9px 14px;font-size:12px;width:100%;">Load roster</button>
+      </div>
+    </div>
+    <div style="margin-top:12px;">
+      <label style="font-size:12px;font-weight:700;color:var(--ink);">🏥 Main Campus · Duty team</label>
+      <textarea id="adminRosterMainText" rows="2" placeholder="e.g. Dr. Anand Kumar, Dr. Priya Sundaram"></textarea>
+      <div class="field-hint">Clinicians assigned to Main Campus APS for this month.</div>
+    </div>
+    <div style="margin-top:10px;">
+      <label style="font-size:12px;font-weight:700;color:var(--ink);">🏥 Ranipet Campus · Duty team</label>
+      <textarea id="adminRosterRanipetText" rows="2" placeholder="e.g. Dr. Kevin Paul, Dr. Preethi Verghese"></textarea>
+      <div class="field-hint">Clinicians assigned to Ranipet Campus APS for this month.</div>
+    </div>
+    <button type="button" class="btn" id="adminSaveRosterBtn" style="margin-top:14px;">Save monthly duty teams</button>
+  </div>
+
+  <div class="section-title"><h2>Pending requests</h2></div>
+  <div id="pendingList"></div>
+
+  <div class="section-title"><h2>Team members</h2></div>
+  <div id="memberList"></div>
+</div>
+
+<!-- INSIGHTS -->
+<div class="view" id="view-insights">
+  <div class="section-title">
+    <h2>Insights</h2>
+    <button class="btn secondary" id="copyAuditBtn" style="width:auto;padding:5px 12px;font-size:12px;margin:0;">Copy summary</button>
+  </div>
+
+  <div class="card">
+    <div class="ins-daterow">
+      <select id="ins-range">
+        <option value="thismonth">This month</option>
+        <option value="lastmonth">Last month</option>
+        <option value="last3">Last 3 months</option>
+        <option value="custom">Custom range</option>
+      </select>
+      <div class="ins-customrange" id="ins-customrange" style="display:none;">
+        <input type="date" id="ins-from">
+        <input type="date" id="ins-to">
+      </div>
+    </div>
+    <div class="field-hint" id="ins-rangelabel"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line);">
+      <span style="font-size:12px;font-weight:700;color:var(--ink);">Audit scope:</span>
+      <select id="ins-scope" style="width:auto;padding:3px 8px;font-size:12px;font-weight:600;border-radius:6px;">
+        <option value="aps" selected>APS Managed (Anaesthetist only)</option>
+        <option value="all">Total Hospital Devices (APS + Surgical)</option>
+        <option value="surgeon">Surgical Placements only</option>
+      </select>
+    </div>
+  </div>
+
+  <div id="insightsBody"></div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" data-view="add"><span>Add patient</span><span class="dot"></span></button>
+  <button class="tab" data-view="room-main"><span>Main Campus</span><span class="dot"></span></button>
+  <button class="tab" data-view="room-ranipet"><span>Ranipet</span><span class="dot"></span></button>
+  <button class="tab" data-view="eagle"><span>Bird's eye</span><span class="dot"></span></button>
+</div>
+
+<div class="sheet-backdrop" id="sheetBackdrop"></div>
+<div class="sheet" id="sheet"></div>
+<div class="dc-backdrop" id="dcBackdrop">
+  <div class="dc-card">
+    <h3 id="dcTitle">Mark discharged?</h3>
+    <p id="dcMsg"></p>
+    <div class="dc-actions">
+      <button class="dc-cancel" id="dcCancel">Cancel</button>
+      <button class="dc-confirm" id="dcConfirm">Discharge</button>
+    </div>
+  </div>
+</div>
+<div class="dc-backdrop" id="reuseBackdrop">
+  <div class="dc-card">
+    <h3 id="reuseTitle">Discharged record found</h3>
+    <p id="reuseMsg"></p>
+    <div class="dc-actions stacked">
+      <button class="dc-confirm" id="reuseNewBtn">Start new entry</button>
+      <button class="dc-cancel" id="reuseReactivateBtn">Reactivate this record</button>
+      <button class="dc-link" id="reuseCancelBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- MONTHLY DUTY TEAM MODAL (ADMIN ONLY) -->
+<div class="dc-backdrop" id="teamModalBackdrop">
+  <div class="dc-card" style="max-width:440px;">
+    <h3 id="teamModalTitle">APS Duty Teams</h3>
+    <p id="teamModalSubtitle" style="font-size:12px;color:var(--ink-soft);margin-top:2px;">Assigned clinicians for this month</p>
+    <div style="margin:14px 0 6px;">
+      <label style="font-size:12px;font-weight:700;display:block;margin-bottom:4px;color:var(--ink);">🏥 Main Campus Team</label>
+      <textarea id="teamModalMainInput" rows="2" placeholder="e.g. Dr. Anand Kumar, Dr. Priya Sundaram" style="width:100%;box-sizing:border-box;"></textarea>
+    </div>
+    <div style="margin:10px 0 6px;">
+      <label style="font-size:12px;font-weight:700;display:block;margin-bottom:4px;color:var(--ink);">🏥 Ranipet Campus Team</label>
+      <textarea id="teamModalRanipetInput" rows="2" placeholder="e.g. Dr. Kevin Paul, Dr. Preethi Verghese" style="width:100%;box-sizing:border-box;"></textarea>
+      <div class="field-hint" style="margin-top:5px;line-height:1.4;">Names can be comma-separated. They appear on the Bird's Eye registry and Excel audit for their respective campuses. Only administrators can save.</div>
+    </div>
+    <div class="dc-actions" style="margin-top:14px;">
+      <button type="button" class="dc-cancel" id="teamModalCancel">Cancel</button>
+      <button type="button" class="btn" id="teamModalSave" style="width:auto;margin:0;padding:9px 18px;font-size:13px;">Save Teams</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+</div>
+
+<datalist id="doneby-suggestions"></datalist>
+<datalist id="dx-suggestions"></datalist>
+<datalist id="surgery-suggestions"></datalist>
+
+<script type="module" src="/src/dolora-app.js"></script>
+<script type="module" src="/src/dolora-auth.js"></script>
+</body>
+</html>
